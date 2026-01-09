@@ -1,0 +1,8 @@
+[package]
+name = "ratatui-canvas-polygon"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui-core = "0.1.0"
+ratatui-widgets = "0.3.0"
