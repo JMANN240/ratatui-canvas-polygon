@@ -235,6 +235,7 @@ dependencies = [
 name = "ratatui-canvas-polygon"
 version = "0.1.0"
 dependencies = [
+ "line-clipping",
  "ratatui-core",
  "ratatui-widgets",
 ]

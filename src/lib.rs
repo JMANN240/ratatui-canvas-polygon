@@ -1,6 +1,8 @@
 use ratatui_core::style::Color;
 use ratatui_widgets::canvas::{Line, Painter, Shape};
 
+pub mod triangle;
+
 pub struct HollowPolygon<'a> {
     pub coords: &'a [(f64, f64)],
     pub color: Color,
