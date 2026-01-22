@@ -8,11 +8,20 @@ use crate::signed_area;
 pub struct Triangle {
     pub coords: [(f64, f64); 3],
     pub color: Color,
+    pub maybe_draw_function: Option<Box<dyn Fn(usize, usize) -> bool>>,
 }
 
 impl Triangle {
-    pub fn new(coords: [(f64, f64); 3], color: Color) -> Self {
-        let mut first = Self { coords, color };
+    pub fn new(
+        coords: [(f64, f64); 3],
+        color: Color,
+        maybe_draw_function: Option<Box<dyn Fn(usize, usize) -> bool>>,
+    ) -> Self {
+        let mut first = Self {
+            coords,
+            color,
+            maybe_draw_function,
+        };
 
         if !first.is_wound_ccw() {
             first.coords.reverse();
@@ -150,7 +159,12 @@ impl Shape for Triangle {
 
         for x in x_min..x_max {
             for y in y_min..y_max {
-                if self.grid_point_in_self(painter, (x, y)) {
+                if self.grid_point_in_self(painter, (x, y))
+                    && self
+                        .maybe_draw_function
+                        .as_ref()
+                        .is_none_or(|draw_function| draw_function(x, y))
+                {
                     painter.paint(x, y, self.color);
                 }
             }
@@ -166,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_on_canvas_points() {
-        let triangle = Triangle::new([(0.0, 0.0), (2.0, 0.0), (0.0, 1.0)], Color::White);
+        let triangle = Triangle::new([(0.0, 0.0), (2.0, 0.0), (0.0, 1.0)], Color::White, None);
 
         let zero_two_points = triangle.on_canvas_points((&[0.0, 2.0], &[0.0, 2.0]));
         assert_eq!(zero_two_points, &[(0.0, 0.0), (2.0, 0.0), (0.0, 1.0)]);
@@ -183,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_bounding_box_canvas_1() {
-        let triangle = Triangle::new([(0.0, 0.0), (2.0, 0.0), (0.0, 1.0)], Color::White);
+        let triangle = Triangle::new([(0.0, 0.0), (2.0, 0.0), (0.0, 1.0)], Color::White, None);
 
         let zero_two_bounds = triangle.bounding_box_canvas((&[0.0, 2.0], &[0.0, 2.0]));
         assert_eq!(zero_two_bounds, Some((0.0, 2.0, 0.0, 1.0)));
@@ -197,14 +211,14 @@ mod tests {
 
     #[test]
     fn test_bounding_box_canvas_2() {
-        let triangle = Triangle::new([(0.25, 0.25), (0.25, 0.75), (0.75, 0.75)], Color::White);
+        let triangle = Triangle::new([(0.25, 0.25), (0.25, 0.75), (0.75, 0.75)], Color::White, None);
 
         let bounds = triangle.bounding_box_canvas((&[0.0, 1.0], &[0.0, 1.0]));
         assert_eq!(bounds, Some((0.25, 0.75, 0.25, 0.75)));
     }
 
     #[test]
-    fn test_render_triangle() {
+    fn test_render_triangle_1() {
         let canvas = Canvas::default()
             .x_bounds([0.0, 1.0])
             .y_bounds([0.0, 1.0])
@@ -212,10 +226,12 @@ mod tests {
                 context.draw(&Triangle::new(
                     [(0.25, 0.25), (0.25, 0.75), (0.5, 0.75)],
                     Color::White,
+                    None,
                 ));
                 context.draw(&Triangle::new(
                     [(0.75, 0.25), (0.75, 0.75), (0.5, 0.75)],
                     Color::White,
+                    None,
                 ));
             });
 
@@ -235,6 +251,70 @@ mod tests {
         expected.set_style(Rect::new(12, 1, 25, 1), line_style);
         expected.set_style(Rect::new(12, 2, 6, 1), line_style);
         expected.set_style(Rect::new(32, 2, 5, 1), line_style);
+
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn test_render_triangle_2() {
+        let canvas = Canvas::default()
+            .x_bounds([0.0, 1.0])
+            .y_bounds([0.0, 1.0])
+            .paint(|context| {
+                context.draw(&Triangle::new(
+                    [(-0.25, 0.25), (0.25, 0.75), (0.5, 0.75)],
+                    Color::White,
+                    None,
+                ));
+            });
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, 50, 4));
+
+        canvas.render(buf.area, &mut buf);
+
+        let mut expected = Buffer::with_lines(vec![
+            "                                                  ",                                                                                                                                         
+            "   ⢀⣀⣀⣠⣤⣤⣴⡶⠶⠾⠿⠿⠟⠛⠛⠛⠛⠋⠉⠉⠉⠉                         ",                                                                                                                                         
+            "⠉⠉⠉⠉⠉⠁                                            ",                                                                                                                                         
+            "                                                  ",
+        ]);
+
+        let line_style = Style::default().white();
+
+        expected.set_style(Rect::new(3, 1, 22, 1), line_style);
+        expected.set_style(Rect::new(0, 2, 6, 1), line_style);
+
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
+    fn test_render_triangle_3() {
+        let canvas = Canvas::default()
+            .x_bounds([0.0, 1.0])
+            .y_bounds([0.0, 1.0])
+            .paint(|context| {
+                context.draw(&Triangle::new(
+                    [(-0.25, 0.25), (-0.25, 0.75), (0.5, 0.75)],
+                    Color::White,
+                    None,
+                ));
+            });
+
+        let mut buf = Buffer::empty(Rect::new(0, 0, 50, 4));
+
+        canvas.render(buf.area, &mut buf);
+
+        let mut expected = Buffer::with_lines(vec![
+            "                                                  ",                                                                                                                                         
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠿⠿⠿⠿⠟⠛⠛⠛⠛⠋⠉⠉⠉⠉                         ",                                                                                                                                         
+            "⠉⠉⠉⠉⠉⠁                                            ",                                                                                                                                         
+            "                                                  ",
+        ]);
+
+        let line_style = Style::default().white();
+
+        expected.set_style(Rect::new(0, 1, 25, 1), line_style);
+        expected.set_style(Rect::new(0, 2, 6, 1), line_style);
 
         assert_eq!(buf, expected);
     }
